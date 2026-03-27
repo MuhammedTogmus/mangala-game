@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mangala (Cafe Vibe)</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="overlay"></div>
+
+    <div id="hand-container">
+        <div class="stone stone-unified"></div>
+        <div id="hand-count" class="stone-badge">0</div>
+    </div>
+
+    <div class="game-container">
+        <header>
+            <h1>Mangala</h1>
+            <div class="controls">
+                <label for="difficulty">Zorluk Seviyesi:</label>
+                <select id="difficulty">
+                    <option value="easy">Kolay</option>
+                    <option value="medium" selected>Orta</option>
+                    <option value="hard">Zor</option>
+                </select>
+                <button id="restart-btn" class="btn">Yeniden Başla</button>
+            </div>
+            <div class="status" id="status-text">Senin Sıran!</div>
+        </header>
+
+        <div class="board-frame">
+            <div class="board" id="board">
+                <!-- Bot's Treasury (index 13) -->
+                <div class="treasury bot-treasury" id="pit-13">
+                    <div class="stone-count">0</div>
+                    <div class="stones-container"></div>
+                </div>
+
+                <div class="pits-area">
+                    <!-- Bot's pits (indices 12 down to 7) -->
+                    <div class="row bot-row">
+                        <div class="pit" id="pit-12"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-11"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-10"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-9"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-8"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-7"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                    </div>
+                    <!-- Player's pits (indices 0 to 5) -->
+                    <div class="row player-row">
+                        <div class="pit" id="pit-0"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-1"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-2"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-3"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-4"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                        <div class="pit" id="pit-5"><div class="stone-count">4</div><div class="stones-container"></div></div>
+                    </div>
+                </div>
+
+                <!-- Player's Treasury (index 6) -->
+                <div class="treasury player-treasury" id="pit-6">
+                    <div class="stone-count">0</div>
+                    <div class="stones-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-over-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="winner-text">Kazandın!</h2>
+                <p>Skor - Sen: <span id="final-score-player"></span> | Bot: <span id="final-score-bot"></span></p>
+                <button id="play-again-btn" class="btn">Tekrar Oyna</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
