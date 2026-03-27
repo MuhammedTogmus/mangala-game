@@ -10,6 +10,43 @@
 <body>
     <div class="overlay"></div>
 
+    <audio id="bgm" src="bgm.mp3" loop></audio>
+    <button id="bgm-btn" class="bgm-btn" title="Klasik Müzik">🔇</button>
+
+    <div id="main-menu" class="menu-overlay">
+        <div class="menu-content">
+            <h1>Mangala</h1>
+            <p class="subtitle">Geleneksel Strateji</p>
+            
+            <div id="primary-buttons" class="menu-buttons">
+                <button id="menu-tutorial-btn" class="menu-btn tutorial-btn">Nasıl Oynanır? 📖</button>
+                <button id="menu-play-btn" class="menu-btn play-btn">Oyna 🎮</button>
+            </div>
+            
+            <div id="difficulty-selection" class="menu-buttons hidden">
+                <h3>Zorluk Seçimi</h3>
+                <button class="menu-btn diff-btn" data-diff="easy">Kolay 🍼</button>
+                <button class="menu-btn diff-btn" data-diff="medium">Orta ⚔️</button>
+                <button class="menu-btn diff-btn" data-diff="hard">Zor 🧠</button>
+                <button id="back-to-menu-btn" class="menu-btn back-btn">Geri ↩️</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tutorial-overlay" class="tutorial-overlay hidden">
+        <div class="bot-container">
+            <img src="tutorial_bot_avatar.png" alt="Tutorial Bot" id="bot-avatar" />
+            <div class="speech-bubble">
+                <p id="bot-text"></p>
+                <div class="tutorial-controls">
+                    <button id="tts-btn" class="btn bypass-btn">🔊 Dinle</button>
+                    <button id="skip-tutorial-btn" class="btn bypass-btn">Geç</button>
+                    <button id="next-tutorial-btn" class="btn hidden">Devam</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="hand-container">
         <div class="stone stone-unified"></div>
         <div id="hand-count" class="stone-badge">0</div>
@@ -19,13 +56,8 @@
         <header>
             <h1>Mangala</h1>
             <div class="controls">
-                <label for="difficulty">Zorluk Seviyesi:</label>
-                <select id="difficulty">
-                    <option value="easy">Kolay</option>
-                    <option value="medium" selected>Orta</option>
-                    <option value="hard">Zor</option>
-                </select>
-                <button id="restart-btn" class="btn">Yeniden Başla</button>
+                <button id="hint-btn" class="btn" style="background: linear-gradient(135deg, #73d4a3, #cdfaed);">İpucu 💡</button>
+                <button id="restart-btn" class="btn">Ana Menüye Dön</button>
             </div>
             <div class="status" id="status-text">Senin Sıran!</div>
         </header>

@@ -9,6 +9,269 @@ let lastPitDropped = -1;
 const handContainer = document.getElementById('hand-container');
 const handCountText = document.getElementById('hand-count');
 let audioCtx;
+let currentDifficulty = 'medium';
+
+// Menu Variables
+const mainMenu = document.getElementById('main-menu');
+const primaryButtons = document.getElementById('primary-buttons');
+const diffSelection = document.getElementById('difficulty-selection');
+const menuPlayBtn = document.getElementById('menu-play-btn');
+const menuTutorialBtn = document.getElementById('menu-tutorial-btn');
+const backToMenuBtn = document.getElementById('back-to-menu-btn');
+const diffBtns = document.querySelectorAll('.diff-btn');
+
+// Audio and BGM Variables
+const bgmBtn = document.getElementById('bgm-btn');
+const bgm = document.getElementById('bgm');
+bgm.volume = 0.3; // keep it subtle
+
+bgmBtn.onclick = () => {
+    if (!bgm.paused) {
+        bgm.pause();
+        bgmBtn.innerText = "🔇";
+        bgmBtn.classList.remove('playing');
+    } else {
+        bgm.play().catch(e => console.log("BGM play error", e));
+        bgmBtn.innerText = "🎼";
+        bgmBtn.classList.add('playing');
+    }
+};
+
+menuPlayBtn.onclick = () => {
+    primaryButtons.classList.add('hidden');
+    diffSelection.classList.remove('hidden');
+};
+
+backToMenuBtn.onclick = () => {
+    diffSelection.classList.add('hidden');
+    primaryButtons.classList.remove('hidden');
+};
+
+diffBtns.forEach(btn => {
+    btn.onclick = () => {
+        currentDifficulty = btn.getAttribute('data-diff');
+        mainMenu.classList.add('hidden');
+        initBoard();
+    };
+});
+
+menuTutorialBtn.onclick = () => {
+    mainMenu.classList.add('hidden');
+    startTutorial();
+};
+
+document.getElementById('restart-btn').onclick = () => {
+    mainMenu.classList.remove('hidden');
+    primaryButtons.classList.remove('hidden');
+    diffSelection.classList.add('hidden');
+    gameActive = false;
+};
+
+// Tutorial Variables
+const tutorialOverlay = document.getElementById('tutorial-overlay');
+const botText = document.getElementById('bot-text');
+const nextBtn = document.getElementById('next-tutorial-btn');
+const skipBtn = document.getElementById('skip-tutorial-btn');
+const ttsBtn = document.getElementById('tts-btn');
+
+function playTTS(text) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'tr-TR';
+        let voices = window.speechSynthesis.getVoices();
+        
+        let femaleVoice = voices.find(v => v.lang.includes('tr') && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('kadın') || v.name.includes('Yelda') || v.name.includes('Google Türkçe')));
+        
+        if (!femaleVoice) femaleVoice = voices.find(v => v.lang.includes('tr') && !v.localService);
+        
+        if (femaleVoice) {
+            utterance.voice = femaleVoice;
+            utterance.pitch = 1.3;
+        } else {
+            let trVoice = voices.find(v => v.lang.includes('tr'));
+            if (trVoice) utterance.voice = trVoice;
+            utterance.pitch = 1.9; // Yüksek pitch vererek mecburi kadın sesi algısı yaratıyoruz
+        }
+        
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+    }
+}
+
+ttsBtn.onclick = () => {
+    let step = tutorialSteps[currentTutorialStep];
+    let textToRead = isPostTyping ? step.post : step.text;
+    playTTS(textToRead);
+};
+
+let tutorialShown = false;
+let currentTutorialStep = 0;
+let isTyping = false;
+let isPostTyping = false;
+let typeInterval;
+let tutorialActive = false;
+let tutorialTargetPit = -1;
+
+function renderAll() {
+    for (let i = 0; i < 14; i++) renderPit(i);
+    updateCounts();
+}
+
+const tutorialSteps = [
+    { text: "Selam! Ben Mangala Ustan. Bu gerçekçi kafe masasında sana Mangala'nın sırlarını öğreteceğim.", action: null },
+    { text: "Oyunun amacı, kendi hazinende (sağdaki büyük oymalı yer) en çok taşı biriktirmektir.", action: null },
+    { 
+        text: "Kendi tarafındaki (Aşağıdaki) 6 kuyudan birini seçerek başlarsın. İçindeki tüm taşları saat yönünün tersine birer birer dağıtırsın. Hadi, parlayan kuyuya tıkla ve elindeki taş bitene kadar dağıt!",
+        setup: () => {
+            for(let i=0; i<14; i++) board[i] = i===6||i===13 ? 0 : 4;
+            renderAll();
+            tutorialTargetPit = 2;
+            highlightPit(2);
+        },
+        post: "Gördüğün gibi taşlar sırayla dağıtıldı."
+    },
+    {
+        text: "Eğer elindeki son taş kendi hazinene gelirse, ekstra bir tur kazanırsın! Şimdi parlayan kuyuya tıkla.",
+        setup: () => {
+            board.fill(0);
+            board[5] = 1; // Last stone goes to treasury 6
+            board[8] = 4;
+            renderAll();
+            tutorialTargetPit = 5;
+            highlightPit(5);
+        },
+        post: "Harika! Son taşın kendi hazinene geldiği için tekrar oynama hakkı kazandın."
+    },
+    {
+        text: "Eğer son taşın rakip taraftaki bir kuyuya gelir ve oradaki taş sayısını çift yaparsa (2, 4, 6 vb.), o kuyudaki tüm taşları hazinene alırsın. Hadi dene bakalım!",
+        setup: () => {
+            board.fill(0);
+            board[4] = 5; // Will land in pit 8 (drops on 4, 5, 6, 7, 8)
+            board[8] = 1; // Pit 8 becomes 2
+            renderAll();
+            tutorialTargetPit = 4;
+            highlightPit(4);
+        },
+        post: "Mükemmel! Rakibin taşlarını çift yaptın ve kendi hazinene kattın."
+    },
+    {
+        text: "Eğer son taşın kendi tarafındaki boş bir kuyuya gelirse ve tam karşısındaki rakip kuyuda taş varsa, iki tarafotakini de alırsın. Tıkla ve gör!",
+        setup: () => {
+            board.fill(0);
+            board[2] = 1; // Lands in empty pit 3
+            board[3] = 0; 
+            board[9] = 5; // Opponent has 5
+            renderAll();
+            tutorialTargetPit = 2;
+            highlightPit(2);
+        },
+        post: "İşte bu! Kendi boş kuyuna geldiği için rakibin taşlarını da hazinene aldın."
+    },
+    { text: "Artık tamamen hazırsın dostum! Ana menüden zorluk seçerek oynamaya başlayabilirsin. Bol şans!", action: null }
+];
+
+function startTutorial() {
+    initBoard();
+    tutorialActive = true;
+    gameActive = false;
+    tutorialOverlay.classList.remove('hidden');
+    currentTutorialStep = 0;
+    showTutorialStep();
+}
+
+function showTutorialStep() {
+    clearInterval(typeInterval);
+    botText.textContent = '';
+    isTyping = true;
+    isPostTyping = false;
+    tutorialTargetPit = -1;
+    nextBtn.classList.add('hidden');
+    skipBtn.classList.remove('hidden');
+    
+    let step = tutorialSteps[currentTutorialStep];
+    let i = 0;
+    
+    typeInterval = setInterval(() => {
+        botText.textContent += step.text.charAt(i);
+        i++;
+        if (i >= step.text.length) {
+            clearInterval(typeInterval);
+            isTyping = false;
+            if (step.setup) {
+                step.setup();
+                skipBtn.classList.add('hidden'); // Force interaction
+            } else {
+                nextBtn.innerText = currentTutorialStep < tutorialSteps.length - 1 ? "Devam" : "Ana Menüye Dön";
+                nextBtn.classList.remove('hidden');
+            }
+        }
+    }, 30);
+}
+
+function finishTutorialMove() {
+    unhighlightAll();
+    isTyping = true;
+    isPostTyping = true;
+    botText.textContent = '';
+    let text = tutorialSteps[currentTutorialStep].post;
+    let i = 0;
+    typeInterval = setInterval(() => {
+        botText.textContent += text.charAt(i);
+        i++;
+        if (i >= text.length) {
+            clearInterval(typeInterval);
+            isTyping = false;
+            nextBtn.innerText = "Devam";
+            nextBtn.classList.remove('hidden');
+            skipBtn.classList.remove('hidden');
+        }
+    }, 30);
+}
+
+nextBtn.onclick = () => {
+    let step = tutorialSteps[currentTutorialStep];
+    if (isTyping) {
+        clearInterval(typeInterval);
+        isTyping = false;
+        
+        if (isPostTyping) {
+            botText.textContent = step.post;
+            nextBtn.innerText = "Devam";
+            nextBtn.classList.remove('hidden');
+            skipBtn.classList.remove('hidden');
+        } else {
+            botText.textContent = step.text;
+            if (step.setup) {
+                step.setup();
+                skipBtn.classList.add('hidden');
+            } else {
+                nextBtn.innerText = currentTutorialStep < tutorialSteps.length - 1 ? "Devam" : "Ana Menüye Dön";
+                nextBtn.classList.remove('hidden');
+            }
+        }
+        return;
+    }
+    
+    currentTutorialStep++;
+    if (currentTutorialStep >= tutorialSteps.length) {
+        endTutorial();
+    } else {
+        showTutorialStep();
+    }
+};
+
+skipBtn.onclick = () => endTutorial();
+
+function endTutorial() {
+    tutorialActive = false;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    clearInterval(typeInterval);
+    tutorialOverlay.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
+    primaryButtons.classList.remove('hidden');
+    diffSelection.classList.remove('hidden');
+}
 
 function initAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -19,29 +282,31 @@ function playDropSound() {
     if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.1);
-    gain.gain.setValueAtTime(1, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.type = 'sine';
+    let baseFreq = 400 + Math.random() * 200;
+    osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, audioCtx.currentTime + 0.05);
+    gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
+    osc.stop(audioCtx.currentTime + 0.08);
 }
 
 function playErrorSound() {
     if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.3);
+    osc.stop(audioCtx.currentTime + 0.2);
 }
 
 document.addEventListener('mousemove', (e) => {
@@ -62,7 +327,6 @@ function initBoard() {
     expectedNextPit = -1;
     handContainer.style.display = 'none';
     unhighlightAll();
-    updateStatusText("Senin Sıran!");
     
     for (let i = 0; i < 14; i++) {
         renderPit(i);
@@ -70,10 +334,32 @@ function initBoard() {
     }
     updateCounts();
     document.getElementById('game-over-modal').classList.add('hidden');
+    updateStatusText("Senin Sıran!");
 }
 
 function handlePitClick(i, e) {
     if (!audioCtx) initAudio();
+
+    if (tutorialActive) {
+        let req = (handStones === 0) ? tutorialTargetPit : expectedNextPit;
+        if (i !== req || isAnimating) {
+            playErrorSound();
+            return;
+        }
+        let cachedGameActive = gameActive;
+        gameActive = true;
+        currentPlayer = 1; 
+        
+        if (handStones === 0) {
+            if (board[i] > 0) pickUpStones(i, e);
+        } else {
+            if (i === expectedNextPit) dropStoneManually(i, e);
+        }
+        
+        gameActive = cachedGameActive;
+        return;
+    }
+
     if (!gameActive || isAnimating || currentPlayer !== 1) return;
     
     if (handStones === 0) {
@@ -175,7 +461,10 @@ function highlightPit(i) {
     if(p) p.classList.add('highlight');
 }
 function unhighlightAll() {
-    document.querySelectorAll('.pit, .treasury').forEach(p => p.classList.remove('highlight'));
+    document.querySelectorAll('.pit, .treasury').forEach(p => {
+        p.classList.remove('highlight');
+        p.classList.remove('hint-active');
+    });
 }
 function updateCounts() {
     for (let i = 0; i < 14; i++) document.getElementById(`pit-${i}`).querySelector('.stone-count').innerText = board[i];
@@ -200,6 +489,13 @@ async function processRules(last) {
                 await captureAnimation(opp, tr);
             }
         }
+    }
+    
+    if (tutorialActive) {
+        isAnimating = false;
+        tutorialTargetPit = -1;
+        finishTutorialMove();
+        return;
     }
     
     if (checkEndGame()) { isAnimating = false; return; }
@@ -267,7 +563,7 @@ function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 async function botTurnRoot() {
     if (!gameActive) return;
-    const diff = document.getElementById('difficulty').value;
+    const diff = currentDifficulty;
     let v = [];
     for(let i=7; i<=12; i++) if(board[i] > 0) v.push(i);
     if (v.length === 0) return;
@@ -384,6 +680,47 @@ function minimax(b, d, a, bt, p) {
     }
 }
 
-document.getElementById('restart-btn').onclick = initBoard;
-document.getElementById('play-again-btn').onclick = initBoard;
-initBoard();
+document.getElementById('play-again-btn').onclick = () => {
+    document.getElementById('game-over-modal').classList.add('hidden');
+    mainMenu.classList.remove('hidden');
+    primaryButtons.classList.remove('hidden');
+    diffSelection.classList.add('hidden');
+};
+
+const hintBtn = document.getElementById('hint-btn');
+hintBtn.onclick = () => {
+    if (!gameActive || isAnimating || currentPlayer !== 1 || handStones > 0 || tutorialActive) return;
+    
+    hintBtn.innerText = "Düşünüyor...";
+    hintBtn.disabled = true;
+    
+    setTimeout(() => {
+        let bestMove = getPlayerHint();
+        if (bestMove !== -1) {
+            unhighlightAll(); 
+            document.getElementById(`pit-${bestMove}`).classList.add('hint-active');
+            updateStatusText("İpucu: " + (bestMove + 1) + ". Kuyu!");
+        }
+        hintBtn.innerText = "İpucu 💡";
+        hintBtn.disabled = false;
+    }, 50);
+};
+
+function getPlayerHint() {
+    let v = [];
+    for(let i=0; i<=5; i++) if(board[i] > 0) v.push(i);
+    if (v.length === 0) return -1;
+    
+    let bestScore = Infinity; 
+    let bestMove = v[0];
+    
+    for (let m of v) {
+        let r = simulateMove(board, m, 1);
+        let s = minimax(r.boardResult, 5, -Infinity, Infinity, r.extraTurn ? 1 : 2);
+        if (s < bestScore) { 
+            bestScore = s; 
+            bestMove = m; 
+        }
+    }
+    return bestMove;
+}
